@@ -1,0 +1,734 @@
+name: Build
+
+on:
+  push:
+    branches: [ "master", "test" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -C target-feature=+crt-static -C relocation-model=static
+
+jobs:
+  amd64-linux:
+    runs-on: ubuntu-latest
+
+    outputs:
+      CANCEL: ${{ steps.check.outputs.CANCEL }}
+
+    steps:
+      - uses: actions/checkout@v4
+        #with:
+        #  submodules: true
+
+      - name: use nightly rust
+        run: |
+          rustup default nightly
+          rustup component add rust-src
+
+      - name: Show system info
+        id: check
+        run: |
+          w(){ eval $* || true; }
+          set -x
+          w uname -a ; w sleep 1
+          w ifconfig -a ; w sleep 1
+          w free -h || w free ; w sleep 1
+          w uptime ; w sleep 1
+          w cat /proc/cpuinfo ; w sleep 1
+
+          w rustc --version ; w sleep 1
+          w cargo --version ; w sleep 1
+          w rustup --version
+
+          if git log -1 | grep -F "auto-submit}"
+          then
+            echo "Skip any auto commit by bots"
+            echo "CANCEL=1" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if git log -1 | grep -F "#NOCI"
+          then
+            echo "This commit Disable CI"
+            echo "CANCEL=2" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "CANCEL=0" >> $GITHUB_OUTPUT
+
+      - name: Create binary directory for this job
+        if: ${{ steps.check.outputs.CANCEL == '0' }}
+        run: |
+          git config --global user.name github-actions && git config --global user.email github-actions@github.com
+
+          git switch -C this
+          git switch --orphan bin && git pull origin bin
+          git switch this
+
+          git reset --hard ${{github.sha}}
+
+      - name: Build Linux
+        if: ${{ steps.check.outputs.CANCEL == '0' }}
+        run: |
+          export UPX_GNUTAR_DOWNLOAD_URL='https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz'
+          bash upx.sh cargo build --release --jobs 20 --target x86_64-unknown-linux-gnu --verbose -Z build-std=core,std,alloc,proc_macro
+
+#      - name: Run tests
+#        run: cargo test --release --verbose -- --nocapture
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ steps.check.outputs.CANCEL == '0' }}
+        with:
+          name: gfwdns.amd64-linux
+          path: target/x86_64-unknown-linux-gnu/release/gfwdns
+
+      - name: Upload binary of amd64 linux
+        if: ${{ steps.check.outputs.CANCEL == '0' && github.event_name != 'pull_request' }}
+        run: |
+          git switch bin
+
+          cd bin
+
+          DIR_NAME="$(git log -1 --format='%cd' --date=format:'%Y-%m-%d_%H-%M-%S' ${{github.sha}})__${{github.sha}}"
+          DIR_PATH="$(realpath $DIR_NAME)"
+
+          mkdir -p "$DIR_PATH"
+          rm latest || true
+          ln -s "$DIR_NAME" latest
+
+          cd ..
+
+          fails=0
+          while true
+          do
+              cp -v target/x86_64-unknown-linux-gnu/release/gfwdns "${DIR_PATH}/gfwdns.amd64-linux"
+              git add -A
+              git commit -m "[${{github.sha}}] upload binary of gfwdns amd64 linux" || true
+
+              ok=1
+              git push origin bin || true $[ok=0]
+
+              if test $ok -eq 1
+              then
+                  exit 0
+              elif test $[++fails] -gt 10
+              then
+                  exit 1
+              else
+                  git pull origin bin --rebase=true
+              fi
+          done
+
+  cross:
+    needs: amd64-linux
+    if: ${{ needs.amd64-linux.outputs.CANCEL == '0' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - mipsel-unknown-linux-musl
+
+          - aarch64-linux-android
+          - armv7-linux-androideabi
+
+          - x86_64-linux-android
+          - i686-linux-android
+
+          - i686-unknown-linux-gnu
+          - i686-unknown-linux-musl
+
+          - aarch64-unknown-linux-gnu
+          - armv7-unknown-linux-gnueabi
+          - armv7-unknown-linux-gnueabihf
+
+          - aarch64-unknown-linux-musl
+          - armv7-unknown-linux-musleabi
+          - armv7-unknown-linux-musleabihf
+
+          #- x86_64-unknown-openbsd
+          #- i686-unknown-openbsd
+          #- aarch64-unknown-openbsd
+
+          - x86_64-unknown-freebsd
+          - i686-unknown-freebsd
+          - aarch64-unknown-freebsd
+          #- armv7-unknown-freebsd
+
+          - x86_64-unknown-netbsd
+          #- i686-unknown-netbsd
+          #- aarch64-unknown-netbsd
+          #- armv7-unknown-netbsd-eabihf
+
+          #- aarch64-pc-windows-msvc
+          #- i686-pc-windows-msvc
+          - i686-pc-windows-gnu
+
+        include:
+          - filename: gfwdns.mipsel-linux-musl
+            target: mipsel-unknown-linux-musl
+
+          - filename: gfwdns.aarch64-android
+            target: aarch64-linux-android
+          - filename: gfwdns.armv7-android
+            target: armv7-linux-androideabi
+
+          - filename: gfwdns.amd64-android
+            target: x86_64-linux-android
+          - filename: gfwdns.i686-android
+            target: i686-linux-android
+
+          - filename: gfwdns.i686-linux
+            target: i686-unknown-linux-gnu
+          - filename: gfwdns.i686-linux-musl
+            target: i686-unknown-linux-musl
+
+          - filename: gfwdns.aarch64-linux
+            target: aarch64-unknown-linux-gnu
+          - filename: gfwdns.armv7-linux
+            target: armv7-unknown-linux-gnueabi
+          - filename: gfwdns.armv7hf-linux
+            target: armv7-unknown-linux-gnueabihf
+
+          - filename: gfwdns.aarch64-linux-musl
+            target: aarch64-unknown-linux-musl
+          - filename: gfwdns.armv7-linux-musl
+            target: armv7-unknown-linux-musleabi
+          - filename: gfwdns.armv7hf-linux-musl
+            target: armv7-unknown-linux-musleabihf
+
+          #- filename: gfwdns.amd64-openbsd
+          #  target: x86_64-unknown-openbsd
+          #- filename: gfwdns.i686-openbsd
+          #  target: i686-unknown-openbsd
+
+          #- filename: gfwdns.aarch64-openbsd
+          #  target: aarch64-unknown-openbsd
+
+          - filename: gfwdns.amd64-freebsd
+            target: x86_64-unknown-freebsd
+          - filename: gfwdns.i686-freebsd
+            target: i686-unknown-freebsd
+
+          - filename: gfwdns.aarch64-freebsd
+            target: aarch64-unknown-freebsd
+          #- filename: gfwdns.armv7-freebsd
+          #  target: armv7-unknown-freebsd
+
+          - filename: gfwdns.amd64-netbsd
+            target: x86_64-unknown-netbsd
+          #- filename: gfwdns.i686-netbsd
+          #  target: i686-unknown-netbsd
+
+          #- filename: gfwdns.aarch64-netbsd
+          #  target: aarch64-unknown-netbsd
+          #- filename: gfwdns.armv7hf-netbsd
+          #  target: armv7-unknown-netbsd-eabihf
+
+
+          #- filename: gfwdns.aarch64-windows.exe
+          #  target: aarch64-pc-windows-msvc
+          #- filename: gfwdns.i686-windows.exe
+          #  target: i686-pc-windows-msvc
+          - filename: gfwdns.i686-windows.exe
+            target: i686-pc-windows-gnu
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        #with:
+        #  submodules: true
+
+      - name: Show system info
+        run: |
+          w(){ eval $* || true; }
+          set -x
+          w uname -a ; w sleep 1
+          w ifconfig -a ; w sleep 1
+          w free -h || w free ; w sleep 1
+          w uptime ; w sleep 1
+          w cat /proc/cpuinfo ; w sleep 1
+
+          w rustc --version ; w sleep 1
+          w cargo --version ; w sleep 1
+          w rustup --version
+
+      - name: Create binary directory for this job
+        run: |
+          git config --global user.name github-actions && git config --global user.email github-actions@github.com
+
+          git switch -C this
+          git switch --orphan bin && git pull origin bin
+          git switch this
+
+          git reset --hard ${{github.sha}}
+
+      - name: Install Cross
+        run: RUSTFLAGS='' cargo install cross
+
+      - name: Cross Build ${{matrix.target}}
+        run: |
+          export UPX_GNUTAR_DOWNLOAD_URL='https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz'
+
+          ARGS=''
+          case "${{matrix.target}}" in
+              i686-unknown-linux-*)
+                  ;;
+              *)
+                  rustup default nightly
+                  rustup component add rust-src
+                  ARGS='-Z build-std=core,std,alloc,proc_macro'
+
+                  case "${{matrix.target}}" in
+                      mipsel* | aarch64-linux-android | *freebsd | *windows* ) unset RUSTFLAGS ;;
+                      *) ;;
+                  esac
+
+                  ;;
+          esac
+
+          eval bash upx.sh cross build --release --jobs 20 --target ${{matrix.target}} --verbose $ARGS
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ ! contains(matrix.target, 'windows') }}
+        with:
+          name: ${{matrix.filename}}
+          path: target/${{matrix.target}}/release/gfwdns
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ contains(matrix.target, 'windows') }}
+        with:
+          name: ${{matrix.filename}}
+          path: target/${{matrix.target}}/release/gfwdns.exe
+
+      - name: Upload binary of ${{matrix.target}}
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          git switch bin
+
+          if echo "${{matrix.target}}" | grep -F 'windows' &>/dev/null
+          then
+              suffix='.exe'
+          else
+              suffix=''
+          fi
+
+          DIR="bin/$(git log -1 --format='%cd' --date=format:'%Y-%m-%d_%H-%M-%S' ${{github.sha}})__${{github.sha}}/"
+          fails=0
+          while true
+          do
+              mkdir -p "$DIR"
+              cp -v "target/${{matrix.target}}/release/gfwdns${suffix}" "${DIR}/${{matrix.filename}}"
+              git add -A
+              git commit -m "[${{github.sha}}] upload binary of ${{matrix.filename}}" || true
+
+              ok=1
+              git push origin bin || true $[ok=0]
+
+              if test $ok -eq 1
+              then
+                  exit 0
+              elif test $[++fails] -gt 10
+              then
+                  exit 1
+              else
+                  git pull origin bin --rebase=true
+              fi
+          done
+
+  vm-amd64-openbsd:
+    needs: amd64-linux
+    if: ${{ needs.amd64-linux.outputs.CANCEL == '0' }}
+
+    name: amd64-openbsd (vm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create binary directory for this job
+        run: |
+          git config --global user.name github-actions && git config --global user.email github-actions@github.com
+
+          git switch -C this
+          git switch --orphan bin && git pull origin bin
+          git switch this
+
+          git reset --hard ${{github.sha}}
+
+      - name: build on openbsd vm
+        uses: vmactions/openbsd-vm@v1
+        with:
+          usesh: true
+          mem: 8192
+          sync: sshfs
+          copyback: true
+          prepare: |
+            export PATH="/usr/sbin:/sbin:$PATH"
+            pkg_add gmake
+            pkg_add rust
+          run: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            echo "===== rustc --version ====="
+            rustc --version
+            echo "===== uname -a        ====="
+            uname -a
+            
+            cargo build --release --jobs 20 --target x86_64-unknown-openbsd --verbose # -Z build-std=core,std,alloc,proc_macro
+
+      - name: try use upx compress
+        run: |
+          export UPX_DISABLE=1
+          bash upx.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gfwdns.amd64-openbsd
+          path: target/x86_64-unknown-openbsd/release/gfwdns
+
+      - name: Upload binary of amd64 openbsd
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          git switch bin
+
+          DIR="bin/$(git log -1 --format='%cd' --date=format:'%Y-%m-%d_%H-%M-%S' ${{github.sha}})__${{github.sha}}/"
+          fails=0
+          while true
+          do
+              mkdir -p "$DIR"
+              cp -v target/x86_64-unknown-openbsd/release/gfwdns "${DIR}/gfwdns.amd64-openbsd"
+              git add -A
+              git commit -m "[${{github.sha}}] upload binary of gfwdns amd64 openbsd" || true
+
+              ok=1
+              git push origin bin || true $[ok=0]
+
+              if test $ok -eq 1
+              then
+                  exit 0
+              elif test $[++fails] -gt 10
+              then
+                  exit 1
+              else
+                  git pull origin bin --rebase=true
+              fi
+          done
+
+  amd64-linux-musl:
+    needs: amd64-linux
+    if: ${{ needs.amd64-linux.outputs.CANCEL == '0' }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        #with:
+        #  submodules: true
+
+      - name: use nightly rust
+        run: |
+          rustup default nightly
+          rustup component add rust-src
+
+      - name: Show system info
+        run: |
+          w(){ eval $* || true; }
+          set -x
+          w uname -a ; w sleep 1
+          w ifconfig -a ; w sleep 1
+          w free -h || w free ; w sleep 1
+          w uptime ; w sleep 1
+          w cat /proc/cpuinfo ; w sleep 1
+
+          w rustc --version ; w sleep 1
+          w cargo --version ; w sleep 1
+          w rustup --version
+
+      - name: Create binary directory for this job
+        run: |
+          git config --global user.name github-actions && git config --global user.email github-actions@github.com
+
+          git switch -C this
+          git switch --orphan bin && git pull origin bin
+          git switch this
+
+          git reset --hard ${{github.sha}}
+
+      - name: Update apt and install Musl
+        run: sudo apt update && sudo apt -y install musl musl-tools
+
+      - name: Rust add Musl target triple
+        run: rustup target add x86_64-unknown-linux-musl
+
+      - name: Build Linux (Musl)
+        run: bash upx.sh cargo build --release --jobs 20 --target x86_64-unknown-linux-musl --verbose -Z build-std=core,std,alloc,proc_macro
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gfwdns.amd64-linux-musl
+          path: target/x86_64-unknown-linux-musl/release/gfwdns
+
+      - name: Upload binary of amd64 linux (musl)
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          git switch bin
+
+          DIR="bin/$(git log -1 --format='%cd' --date=format:'%Y-%m-%d_%H-%M-%S' ${{github.sha}})__${{github.sha}}/"
+          fails=0
+          while true
+          do
+              mkdir -p "$DIR"
+              cp -v target/x86_64-unknown-linux-musl/release/gfwdns "${DIR}/gfwdns.amd64-linux-musl"
+              git add -A
+              git commit -m "[${{github.sha}}] upload binary of gfwdns amd64 linux (musl)" || true
+
+              ok=1
+              git push origin bin || true $[ok=0]
+
+              if test $ok -eq 1
+              then
+                  exit 0
+              elif test $[++fails] -gt 10
+              then
+                  exit 1
+              else
+                  git pull origin bin --rebase=true
+              fi
+          done
+
+  amd64-windows:
+    needs: amd64-linux
+    if: ${{ needs.amd64-linux.outputs.CANCEL == '0' }}
+
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        #with:
+        #  submodules: true
+
+      - name: use nightly rust
+        run: |
+          rustup default nightly
+          rustup component add rust-src
+
+      - name: Show system info (bash)
+        run: |
+          w(){ eval $* || true; }
+          set -x
+          w uname -a ; w sleep 1
+          w ifconfig -a ; w sleep 1
+          w free -h || w free ; w sleep 1
+          w uptime ; w sleep 1
+          w cat /proc/cpuinfo ; w sleep 1
+
+          w rustc --version ; w sleep 1
+          w cargo --version ; w sleep 1
+          w rustup --version
+        shell: bash
+
+      - name: Show system info (cmd)
+        run: |
+          ver
+          ping -n 2 127.0.0.1 >nul 2>nul
+          systeminfo
+          ping -n 2 127.0.0.1 >nul 2>nul
+          ipconfig /all
+        shell: cmd
+
+      - name: Create binary directory for this job
+        run: |
+          git config --global user.name github-actions && git config --global user.email github-actions@github.com
+
+          git switch -C this
+          git switch --orphan bin && git pull origin bin
+          git switch this
+
+          git reset --hard ${{github.sha}}
+        shell: bash
+
+      - name: Build (windows)
+        run: RUSTFLAGS='' bash upx.sh cargo build --release --jobs 20 --target x86_64-pc-windows-msvc --verbose -Z build-std=core,std,alloc,proc_macro
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gfwdns.amd64-windows.exe
+          path: target/x86_64-pc-windows-msvc/release/gfwdns.exe
+
+      - name: Upload binary of amd64 windows
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          git switch bin
+
+          DIR="bin/$(git log -1 --format='%cd' --date=format:'%Y-%m-%d_%H-%M-%S' ${{github.sha}})__${{github.sha}}/"
+          fails=0
+          while true
+          do
+              mkdir -p "$DIR"
+              cp -v target/x86_64-pc-windows-msvc/release/gfwdns.exe "${DIR}/gfwdns.amd64-windows.exe"
+              git add -A
+              git commit -m "[${{github.sha}}] upload binary of gfwdns amd64 windows" || true
+
+              ok=1
+              git push origin bin || true $[ok=0]
+
+              if test $ok -eq 1
+              then
+                  exit 0
+              elif test $[++fails] -gt 10
+              then
+                  exit 1
+              else
+                  git pull origin bin --rebase=true
+              fi
+          done
+        shell: bash
+
+  amd64-mac:
+    needs: amd64-linux
+    if: ${{ needs.amd64-linux.outputs.CANCEL == '0' }}
+
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+        #with:
+        #  submodules: true
+
+      - name: use nightly rust
+        run: |
+          rustup default nightly
+          rustup component add rust-src
+
+      - name: Show system info
+        run: |
+          w(){ eval $* || true; }
+          set -x
+          w uname -a ; w sleep 1
+          w ifconfig -a ; w sleep 1
+          w free -h || w free ; w sleep 1
+          w uptime ; w sleep 1
+
+          w rustc --version ; w sleep 1
+          w cargo --version ; w sleep 1
+          w rustup --version
+
+      - name: Create binary directory for this job
+        run: |
+          git config --global user.name github-actions && git config --global user.email github-actions@github.com
+
+          git switch -C this
+          git switch --orphan bin && git pull origin bin
+          git switch this
+
+          git reset --hard ${{github.sha}}
+      
+      - name: Build Mac (amd64)
+        run: bash upx.sh cargo build --release --jobs 20 --target x86_64-apple-darwin --verbose -Z build-std=core,std,alloc,proc_macro
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gfwdns.amd64-mac
+          path: target/x86_64-apple-darwin/release/gfwdns
+
+      - name: Upload binary of amd64 mac
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          git switch bin
+
+          DIR="bin/$(git log -1 --format='%cd' --date=format:'%Y-%m-%d_%H-%M-%S' ${{github.sha}})__${{github.sha}}/"
+          fails=0
+          while true
+          do
+              mkdir -p "$DIR"
+              cp -v target/x86_64-apple-darwin/release/gfwdns "${DIR}/gfwdns.amd64-mac"
+              git add -A
+              git commit -m "[${{github.sha}}] upload binary of gfwdns amd64 mac" || true
+
+              ok=1
+              git push origin bin || true $[ok=0]
+
+              if test $ok -eq 1
+              then
+                  exit 0
+              elif test $[++fails] -gt 10
+              then
+                  exit 1
+              else
+                  git pull origin bin --rebase=true
+              fi
+          done
+
+  aarch64-mac:
+    needs: amd64-linux
+    if: ${{ needs.amd64-linux.outputs.CANCEL == '0' }}
+
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        #with:
+        #  submodules: true
+
+      - name: use nightly rust
+        run: |
+          rustup default nightly
+          rustup component add rust-src
+
+      - name: Show system info
+        run: |
+          w(){ eval $* || true; }
+          set -x
+          w uname -a ; w sleep 1
+          w ifconfig -a ; w sleep 1
+          w free -h || w free ; w sleep 1
+          w uptime ; w sleep 1
+
+          w rustc --version ; w sleep 1
+          w cargo --version ; w sleep 1
+          w rustup --version
+
+      - name: Create binary directory for this job
+        run: |
+          git config --global user.name github-actions && git config --global user.email github-actions@github.com
+
+          git switch -C this
+          git switch --orphan bin && git pull origin bin
+          git switch this
+
+          git reset --hard ${{github.sha}}
+      
+      - name: Build Mac (aarch64)
+        run: bash upx.sh cargo build --release --jobs 20 --target aarch64-apple-darwin --verbose -Z build-std=core,std,alloc,proc_macro
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gfwdns.aarch64-mac
+          path: target/aarch64-apple-darwin/release/gfwdns
+
+      - name: Upload binary of aarch64 mac
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          git switch bin
+
+          DIR="bin/$(git log -1 --format='%cd' --date=format:'%Y-%m-%d_%H-%M-%S' ${{github.sha}})__${{github.sha}}/"
+          fails=0
+          while true
+          do
+              mkdir -p "$DIR"
+              cp -v target/aarch64-apple-darwin/release/gfwdns "${DIR}/gfwdns.aarch64-mac"
+              git add -A
+              git commit -m "[${{github.sha}}] upload binary of gfwdns aarch64 mac" || true
+
+              ok=1
+              git push origin bin || true $[ok=0]
+
+              if test $ok -eq 1
+              then
+                  exit 0
+              elif test $[++fails] -gt 10
+              then
+                  exit 1
+              else
+                  git pull origin bin --rebase=true
+              fi
+          done
+
