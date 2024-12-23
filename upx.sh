@@ -104,6 +104,6 @@ EOF
 
 command $@
 status_code="$?"
-find "$(realpath ./target/)" \( -name hitdns -or -name hitdns.exe \) -exec bash --norc -x $tmp '{}' \;
+find "$(realpath ./target/)" \( -name gfwdns -or -name gfwdns.exe \) -exec bash --norc -x $tmp '{}' \;
 exit "$status_code"
 
