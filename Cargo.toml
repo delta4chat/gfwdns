@@ -1,0 +1,30 @@
+[package]
+name = "gfwdns"
+version = "0.1.0-beta"
+edition = "2021"
+description = "gfwdns is a DNS traffic diverter for provide local CDN-friendly results while avoiding DNS pollution by GFW."
+license = "GPL-3.0"
+authors = ["Delta4 <delta4chat@gmx.com>"]
+repository = "https://github.com/delta4chat/gfwdns"
+
+[features]
+default=["sqlite"]
+sqlite=["dep:sqlx"]
+
+[dependencies]
+anyhow = { version = "1.0.94", features = ["backtrace"] }
+clap = { version = "4.5.23", features = ["derive"] }
+directories = "5.0.1"
+env_logger = "0.11.6"
+fastrand = "2.3.0"
+hickory-proto = { version = "0.24.2", default-features = false }
+log = "0.4.22"
+once_cell = { version = "1.20.2", features = ["parking_lot", "portable-atomic"] }
+portable-atomic = "1.10.0"
+postcard = { version = "1.1.1", features = ["use-std"] }
+scc = "2.2.6"
+serde = { version = "1.0.216", features = ["derive", "std", "alloc", "rc"] }
+smol = "2.0.2"
+smolscale2 = "0.6.0"
+smoltimeout = "0.6.2"
+sqlx = { optional = true, version = "0.8.2", features = ["runtime-async-std", "sqlite"], default-features = false }
