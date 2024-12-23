@@ -1,6 +1,17 @@
 use crate::*;
 
 #[test]
+fn ip_list() {
+    std::thread::sleep(Duration::from_secs(1));
+    dbg!(inside_ips::IPV4_FROM_GEOIP);
+    dbg!(inside_ips::IPV6_FROM_GEOIP);
+
+    dbg!(outside_ips::IPV4_FROM_GEOIP);
+    dbg!(outside_ips::IPV6_FROM_GEOIP);
+
+}
+
+#[test]
 fn ipv4_in_cidr() {
     let ip: Ipv4Addr = "3.0.4.8".parse().unwrap();
     let net = Subnet::new("2.0.0.0".parse().unwrap(), 7);

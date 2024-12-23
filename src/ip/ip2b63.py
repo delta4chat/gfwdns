@@ -31,7 +31,7 @@ def main():
     s=[line.strip().split("/") for line in s.split("\n") if len(line) > 0]
 
     c = 0
-    keywords = ('else', 'enum', 'abstract', 'impl', 'let', 'unsafe', 'priv', 'mod', 'true', 'macro_rules', 'self', 'as', 'virtual', 'move', 'if', 'macro', 'crate', 'extern', 'fn', 'pub', 'struct', 'trait', 'break', 'use', 'while', 'yield', 'dyn', 'await', 'try', 'continue', 'false', 'in', 'static', 'unsized', 'typeof', 'Self', 'box', 'ref', 'super', 'const', 'type', 'async', 'for', 'loop', 'do', 'final', 'override', 'match', 'become', 'return', 'mut', 'where', 'union', 'gen', 'generator', 'v4', 'v6', '_', 'u8', 'u16', 'u32', 'u64', 'usize', 'u128', 'i8', 'i16', 'i32', 'i64', 'isize', 'i128', 'f32', 'f64', 'f16')
+    keywords = ('else', 'enum', 'abstract', 'impl', 'let', 'unsafe', 'priv', 'mod', 'true', 'macro_rules', 'self', 'as', 'virtual', 'move', 'if', 'macro', 'crate', 'extern', 'fn', 'pub', 'struct', 'trait', 'break', 'use', 'while', 'yield', 'dyn', 'await', 'try', 'continue', 'false', 'in', 'static', 'unsized', 'typeof', 'Self', 'box', 'ref', 'super', 'const', 'type', 'async', 'for', 'loop', 'do', 'final', 'override', 'match', 'become', 'return', 'mut', 'where', 'union', 'gen', 'generator', 'v4', 'v6', 'm4', 'm6', '_', 'u8', 'u16', 'u32', 'u64', 'usize', 'u128', 'i8', 'i16', 'i32', 'i64', 'isize', 'i128', 'f32', 'f64', 'f16')
     for it in s:
         if ':' in it[0]:
             ip = ipaddress.IPv6Address(it[0]).exploded.split(':')
@@ -45,7 +45,7 @@ def main():
                     while cb[0].isdigit() or (cb in keywords):
                         cb = int_to_base63(c)
                         c += 1
-                    maps6[ii] = (cb, ('const %s:u16=%d;' % (cb, ii)))
+                    maps6[ii] = (cb, ('%s,%d,' % (cb, ii)))
                 if len(maps6[ii][0]) < len(str(parts[i])):
                     parts[i] = maps6[ii][0]
                 else:
@@ -67,7 +67,7 @@ def main():
                     while cb[0].isdigit() or (cb in keywords):
                         cb = int_to_base63(c)
                         c += 1
-                    maps4[ii] = (cb, ('const %s:u8=%d;' % (cb, ii)))
+                    maps4[ii] = (cb, ('%s,%d,' % (cb, ii)))
                 if len(maps4[ii][0]) < len(str(parts[i])):
                     parts[i] = maps4[ii][0]
                 else:
@@ -84,11 +84,18 @@ def main():
     print(*ipv4, sep='\n')
     print(*ipv6, sep='\n')
 
+    m4 = 'm4!('
     for v in maps4.values():
-        print(v[1])
+        m4 += v[1]
+    m4 += ');'
 
+    m6 = 'm6!('
     for v in maps6.values():
-        print(v[1])
+        m6 += v[1]
+    m6 += ');'
+
+    print(m4)
+    print(m6)
 
 main()
 

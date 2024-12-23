@@ -7,3 +7,16 @@ pub(crate) const fn v6(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h
     Subnet::new(IpAddr::V6(Ipv6Addr::new(a, b, c, d, e, f, g, h)), cidr)
 }
 
+#[macro_export]
+macro_rules! m4 {
+    ($($n:ident, $v:expr $(,)?)*) => {
+        $(const $n:u8=$v;)*
+    }
+}
+
+#[macro_export]
+macro_rules! m6 {
+    ($($n:ident, $v:expr $(,)?)*) => {
+        $(const $n:u16=$v;)*
+    }
+}
