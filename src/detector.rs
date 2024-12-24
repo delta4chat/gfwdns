@@ -627,14 +627,17 @@ impl DomainSpoofDetector {
                 let data: Vec<u8> = wire_len.into_iter().chain(wire.into_iter()).collect();
                 tcp.write_all(&data).await?;
 
-                let mut buf: [u8; 3] = [0, 0, 0];
-                Ok(
-                    if let Some(Ok(_)) = tcp.read_exact(&mut buf).timeout(Duration::from_millis(5000)).await {
-                        false
+                let mut buf: [u8; 1] = [0];
+                let timeout = Duration::from_millis(1600);
+                let wait = Duration::from_millis(150);
+                for _ in 0..3 {
+                    if let Some(Ok(_)) = tcp.read_exact(&mut buf).timeout(timeout).await {
+                        smol::Timer::after(wait).await;
                     } else {
-                        true
+                        return Ok(true);
                     }
-                )
+                }
+                Ok(false)
             },
             EmptySoaFromLocal => {
                 let addr =
@@ -697,21 +700,52 @@ impl DomainSpoofDetector {
 }
 
 async fn tcp_race_connect(addrs: &[SocketAddr]) -> anyhow::Result<TcpStream> {
-    let (send, recv) = smol::channel::bounded(1);
-    for addr in addrs.iter().copied() {
-        let send = send.clone();
-        smolscale2::spawn(async move {
-            let result = TcpStream::connect(addr).await;
-            if let Ok(conn) = result {
-                let _ = send.try_send(conn);
-            }
-        }).detach();
+    let addrs_len = addrs.len();
+    if addrs_len == 0 {
+        anyhow::bail!("tcp_race_connect: no addresses to connect!");
     }
 
-    if let Some(conn) = recv.recv().timeout(Duration::from_secs(5)).await {
-        Ok(conn?)
-    } else {
-        anyhow::bail!("connection timed out: {addrs:?}");
+    let (conn_tx, conn_rx) = smol::channel::bounded(1);
+
+    let mut tasks = Vec::new();
+    for addr in addrs.iter().copied() {
+        let conn_tx = conn_tx.clone();
+        tasks.push(smolscale2::spawn(async move {
+            conn_tx.send((addr, TcpStream::connect(addr).await)).await.unwrap();
+        }));
+    }
+
+    let mut tick: f64 = 5.0 / (addrs_len as f64);
+    if tick < 0.333 {
+        tick = 0.333;
+    }
+    let tick = Duration::from_secs_f64(tick);
+    let started = Instant::now();
+    let mut last_error = None;
+    loop {
+        tasks.retain(|task| { ! task.is_finished() });
+
+        if tasks.is_empty() {
+            anyhow::bail!("tcp_race_connect: all connecting TcpStream failed: {last_error:?}");
+        }
+
+        if let Some(ret) = conn_rx.recv().timeout(tick).await {
+            let (addr, conn_ret) = ret?;
+            match conn_ret {
+                Ok(conn) => {
+                    log::info!("tcp_race_connect: TcpStream connected to {addr:?}");
+                    return Ok(conn);
+                },
+                Err(err) => {
+                    log::debug!("tcp_race_connect: connecting to {addr:?} failed: {:?}", &err);
+                    last_error = Some(err);
+                }
+            }
+        }
+
+        if started.elapsed() > Duration::from_secs(5) {
+            anyhow::bail!("tcp_race_connect: TCP connect to ({addrs:?}) timed out: {last_error:?}");
+        }
     }
 }
 

@@ -17,7 +17,7 @@ pub use ip::*;
 
 pub use core::fmt::Debug;
 
-pub use std::time::{Duration, SystemTime};
+pub use std::time::{Duration, SystemTime, Instant};
 pub use std::sync::Arc;
 pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 pub use std::path::{Path, PathBuf};

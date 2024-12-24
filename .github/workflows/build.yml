@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -C target-feature=+crt-static -C relocation-model=static
+  RUSTFLAGS: -C target-feature=+crt-static # -C relocation-model=static
 
 jobs:
   amd64-linux:

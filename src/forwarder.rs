@@ -62,7 +62,7 @@ impl DNSForwarder {
                 client.send(&wire).await.unwrap();
 
                 let mut resp = vec![0u8; 65535];
-                let len = client.recv(&mut resp).await.unwrap();
+                let len = client.recv(&mut resp).timeout(Duration::from_secs(5)).await.unwrap().unwrap();
 
                 udp.send_to(&resp[..len], peer).await.unwrap();
             }).detach();
