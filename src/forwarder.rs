@@ -221,9 +221,15 @@ impl DNSForwarderBuilder {
             };
 
         if self.detect_method_data_list.is_empty() {
-            let best = DomainSpoofDetectMethod::best_dynamic();
-            log::warn!("No Detect Method & Data provided, using the reasonable best method: ({:?})", &best.0);
-            self.detect_method_data_list.push(best);
+            let best_dynamic = DomainSpoofDetectMethod::best_dynamic();
+            let gfwlist = DomainSpoofDetectMethod::gfwlist();
+            let chinalist = DomainSpoofDetectMethod::chinalist();
+
+            log::warn!("No Detect Method & Data provided, using the reasonable best dynamic method: {:?}", [&best_dynamic.0, &gfwlist.0, &chinalist.0]);
+
+            self.detect_method_data_list.push(gfwlist);
+            self.detect_method_data_list.push(chinalist);
+            self.detect_method_data_list.push(best_dynamic);
         }
 
         let cache =

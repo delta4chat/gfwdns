@@ -254,6 +254,9 @@ impl DomainSpoofDetectMethod {
             "gfw-list" | "gfwlist"
                 => Self::GfwList,
 
+            "china-list" | "chinalist"
+                => Self::ChinaList,
+
             "empty-soa-from-local" | "empty-soa-local" | "empty-soa"
                 => Self::EmptySoaFromLocal,
 
@@ -278,7 +281,7 @@ impl DomainSpoofDetectMethod {
 
     pub fn reset_from_tcp() -> (Self, DomainSpoofDetectData) {
         let ips = outside_dns_list();
-        let list = DomainSpoofDetectAddressList::new(GfwSide::Outside, Some(ips.iter().copied()));
+        let list = DomainSpoofDetectAddressList::outside(Some(ips));
         let data = DomainSpoofDetectData::Address(list);
         (Self::ResetFromTcp, data)
     }
