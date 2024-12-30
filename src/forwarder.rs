@@ -16,10 +16,10 @@ impl DNSForwarder {
         let udp = UdpSocket::bind(self.listen).await.context("cannot bind UDP")?;
         let tcp = TcpListener::bind(self.listen).await.context("cannot bind TCP")?;
 
-        let udp_fut = self.handle_udp(udp);
-        let tcp_fut = self.handle_tcp(tcp);
-
-        udp_fut.await
+        smol::future::or(
+            self.handle_udp(udp),
+            self.handle_tcp(tcp)
+        ).await
     }
 
     async fn handle_udp(&self, udp: UdpSocket) -> anyhow::Result<()> {
@@ -70,8 +70,69 @@ impl DNSForwarder {
     }
     async fn handle_tcp(&self, tcp: TcpListener) -> anyhow::Result<()> {
         loop {
-            log::error!("handle_tcp is not implemented yet");
-            smol::Timer::after(Duration::from_secs(600)).await;
+            let (mut conn, peer) = tcp.accept().await?;
+
+            let detector = self.detector.clone();
+            let local = self.local;
+            let global = self.global;
+
+            smolscale2::spawn(async move {
+                let mut len_buf = [0u8; 2];
+                let mut len;
+
+                let mut msg_buf = vec![0u8; 65535];
+                let mut msg;
+
+                let mut buf: Vec<u8>;
+
+                let mut domain;
+                let mut is_spoofed;
+
+                let mut local_client = None;
+                let mut global_client = None;
+                let mut client;
+                loop {
+                    conn.read_exact(&mut len_buf).await.unwrap();
+                    len = u16::from_be_bytes(len_buf) as usize;
+
+                    conn.read_exact(&mut msg_buf[..len]).await.unwrap();
+
+                    msg = dns::Message::from_vec(&msg_buf[..len]).unwrap();
+                    domain = msg.queries()[0].name().to_ascii();
+
+                    is_spoofed = detector.detect(&domain).await.unwrap();
+                    client =
+                        if is_spoofed {
+                            if global_client.is_none() {
+                                global_client = Some(TcpStream::connect(global).await.unwrap());
+                            }
+                            global_client.as_mut().unwrap()
+                        } else {
+                            if local_client.is_none() {
+                                local_client = Some(TcpStream::connect(local).await.unwrap());
+                            }
+                            local_client.as_mut().unwrap()
+                        };
+
+                    buf =
+                        len_buf.iter().copied()
+                        .chain((&msg_buf[..len]).iter().copied())
+                        .collect();
+
+                    client.write_all(&buf).await.unwrap();
+
+                    client.read_exact(&mut len_buf).await.unwrap();
+                    len = u16::from_be_bytes(len_buf) as usize;
+                    client.read_exact(&mut msg_buf[..len]).await.unwrap();
+
+                    buf = 
+                        len_buf.iter().copied()
+                        .chain((&msg_buf[..len]).iter().copied())
+                        .collect();
+
+                    conn.write_all(&buf).await.unwrap();
+                }
+            }).detach();
         }
     }
 }
