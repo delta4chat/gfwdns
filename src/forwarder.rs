@@ -2,7 +2,7 @@ use crate::*;
 
 #[derive(Clone, Debug)]
 pub struct DNSForwarder {
-    detector: Arc<DomainSpoofDetector>,
+    detectors: Arc<Vec<DomainSpoofDetector>>,
     listen: SocketAddr,
     local: SocketAddr, // e.g. plaintext UDP 53, your router/gateway IP, or HitDNS proxied DoH (recommened)
     global: SocketAddr, // recommended HitDNS proxied DoH. https://docs.rs/hitdns
@@ -33,7 +33,7 @@ impl DNSForwarder {
             wire = buf[..len].to_vec();
             let udp = udp.clone();
 
-            let detector = self.detector.clone();
+            let detectors = self.detectors.clone();
             let local = self.local;
             let global = self.global;
 
@@ -41,7 +41,29 @@ impl DNSForwarder {
                 let msg = dns::Message::from_vec(&wire).unwrap();
                 let domain = msg.queries()[0].name().to_ascii();
 
-                let is_spoofed = detector.detect(&domain).await.unwrap();
+                let mut is_spoofed = None;
+                for detector in detectors.iter() {
+                    match detector.detect(&domain).await {
+                        Ok(b) => {
+                            is_spoofed = Some(b);
+                            if b {
+                                break;
+                            }
+                        },
+                        Err(e) => {
+                            log::warn!("cannot detect the domain {domain:?} is_spoofed: {e:?}");
+                        }
+                    }
+                }
+
+                let is_spoofed =
+                    match is_spoofed {
+                        Some(v) => v,
+                        _ => {
+                            panic!("unable to detect is_spoofed for domain {domain:?}!");
+                        }
+                    };
+
                 let upstream =
                     if is_spoofed {
                         global
@@ -72,7 +94,7 @@ impl DNSForwarder {
         loop {
             let (mut conn, peer) = tcp.accept().await?;
 
-            let detector = self.detector.clone();
+            let detectors = self.detectors.clone();
             let local = self.local;
             let global = self.global;
 
@@ -100,7 +122,29 @@ impl DNSForwarder {
                     msg = dns::Message::from_vec(&msg_buf[..len]).unwrap();
                     domain = msg.queries()[0].name().to_ascii();
 
-                    is_spoofed = detector.detect(&domain).await.unwrap();
+                    is_spoofed = None;
+                    for detector in detectors.iter() {
+                        match detector.detect(&domain).await {
+                            Ok(b) => {
+                                is_spoofed = Some(b);
+                                if b {
+                                    break;
+                                }
+                            },
+                            Err(e) => {
+                                log::warn!("cannot detect the domain {domain:?} is_spoofed: {e:?}");
+                            }
+                        }
+                    }
+
+                    let is_spoofed =
+                        match is_spoofed {
+                            Some(v) => v,
+                            _ => {
+                                panic!("unable to detect is_spoofed for domain {domain:?}!");
+                            }
+                        };
+
                     client =
                         if is_spoofed {
                             if global_client.is_none() {
@@ -139,8 +183,8 @@ impl DNSForwarder {
 
 #[derive(Debug, Default)]
 pub struct DNSForwarderBuilder {
-    maybe_detect_method: Option<DomainSpoofDetectMethod>,
-    maybe_detect_data: Option<DomainSpoofDetectData>,
+    detect_method_data_list: Vec<(DomainSpoofDetectMethod, DomainSpoofDetectData)>,
+
     maybe_status_cache: Option<DomainStatusCache>,
 
     maybe_listen: Option<SocketAddr>,
@@ -176,24 +220,11 @@ impl DNSForwarderBuilder {
                 }
             };
 
-        let method =
-            match self.maybe_detect_method {
-                Some(val) => val,
-                _ => {
-                    let best = DomainSpoofDetectMethod::best_dynamic();
-                    log::warn!("No Detect Method provided, using the reasonable best method: ({:?})", &best.0);
-                    self.maybe_detect_data = Some(best.1);
-                    best.0
-                }
-            };
-
-        let data =
-            match self.maybe_detect_data {
-                Some(val) => val,
-                _ => {
-                    anyhow::bail!("No Detect Data provided!");
-                }
-            };
+        if self.detect_method_data_list.is_empty() {
+            let best = DomainSpoofDetectMethod::best_dynamic();
+            log::warn!("No Detect Method & Data provided, using the reasonable best method: ({:?})", &best.0);
+            self.detect_method_data_list.push(best);
+        }
 
         let cache =
             match self.maybe_status_cache {
@@ -204,9 +235,14 @@ impl DNSForwarderBuilder {
                 }
             };
 
-        let detector = Arc::new(DomainSpoofDetector::new(method, data, Some(cache)).await?);
+        let mut detectors = Vec::new();
+        for (method, data) in self.detect_method_data_list.into_iter() {
+            detectors.push(DomainSpoofDetector::new(method, data, Some(cache.clone())).await?);
+        }
+        let detectors = Arc::new(detectors);
+
         Ok(DNSForwarder {
-            detector,
+            detectors,
             listen,
             local,
             global,
@@ -218,12 +254,8 @@ impl DNSForwarderBuilder {
         self
     }
 
-    pub fn detect_method(mut self, m: DomainSpoofDetectMethod) -> Self {
-        self.maybe_detect_method = Some(m);
-        self
-    }
-    pub fn detect_data(mut self, d: DomainSpoofDetectData) -> Self {
-        self.maybe_detect_data = Some(d);
+    pub fn detect_method_data(mut self, m: DomainSpoofDetectMethod, d: DomainSpoofDetectData) -> Self {
+        self.detect_method_data_list.push((m, d));
         self
     }
 

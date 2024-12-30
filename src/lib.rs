@@ -12,10 +12,11 @@ pub use detector::*;
 pub mod forwarder;
 pub use forwarder::*;
 
-pub mod ip;
-pub use ip::*;
+pub mod data;
+pub use data::*;
 
 pub use core::fmt::Debug;
+pub use core::borrow::Borrow;
 
 pub use std::time::{Duration, SystemTime, Instant};
 pub use std::sync::Arc;

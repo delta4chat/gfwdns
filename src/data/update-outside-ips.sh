@@ -19,7 +19,7 @@ outfile="${outdir}/outside_ips.rs"
 
 py="${outdir}/ip2b63.py"
 
-tmp="$(mktemp -d -t gfwdnsChinaIpUpdater.XXXXXXXX)"
+tmp="$(mktemp -d -t gfwdnsGlobalIpUpdater.XXXXXXXX)"
 trap "rm -rfv $tmp" EXIT
 cd $tmp
 
@@ -38,8 +38,7 @@ cd country
     cat {de,et,ec,tt,it}/aggregated.json | jq -r '.subnets.ipv4[]' > ips.txt
 	cat {de,et,ec,tt,it}/aggregated.json | jq -r '.subnets.ipv6[]' >> ips.txt
 
-	cat ips.txt | python3 $py #-c 'import sys, ipaddress; s=sys.stdin.read().strip(); s=[line.split("/") for line in s.split("\n")]; print(*["    v6("+(",".join([(str(int(i, 16)) if len(str(int(i, 16))) <= len(hex(int(i, 16))) else hex(int(i, 16))) for i in ipaddress.IPv6Address(it[0]).exploded.split(":")]))+","+it[1]+"),//IPv6="+it[0]+"/"+it[1] for it in s], sep="\n")'
-
+	cat ips.txt | sort -u | python3 $py
 } > rs.tmp.out
 
 mv rs.tmp.out $outfile

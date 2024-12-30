@@ -39,7 +39,7 @@ cd cn
 	cat aggregated.json | jq -r '.subnets.ipv4[]' > ips.txt
 	cat aggregated.json | jq -r '.subnets.ipv6[]' >> ips.txt
 	
-	cat ips.txt | python3 $py
+	cat ips.txt | sort -u | python3 $py
 } > rs.tmp.out
 
 mv rs.tmp.out $outfile

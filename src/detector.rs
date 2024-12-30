@@ -162,11 +162,30 @@ pub const fn root_servers_addr() -> [SocketAddr; ROOT_SERVERS_LEN * 2] {
 }
 
 pub fn scc_hashset_of_root_servers() -> Arc<scc::HashSet<SocketAddr>> {
-    let map = scc::HashSet::new();
+    let set = scc::HashSet::new();
     for adr in root_servers_addr() {
-        let _ = map.insert(adr);
+        let _ = set.insert(adr);
     }
-    Arc::new(map)
+    Arc::new(set)
+}
+
+pub fn scc_hashset_of_inside_domains() -> Arc<scc::HashSet<dns::Name>> {
+    let set = scc::HashSet::new();
+    for domain in inside_domain_list().iter() {
+        if let Ok(name) = dns::Name::from_str_relaxed(domain) {
+            let _ = set.insert(name);
+        }
+    }
+    Arc::new(set)
+}
+pub fn scc_hashset_of_outside_domains() -> Arc<scc::HashSet<dns::Name>> {
+    let set = scc::HashSet::new();
+    for domain in outside_domain_list().iter() {
+        if let Ok(name) = dns::Name::from_str_relaxed(domain) {
+            let _ = set.insert(name);
+        }
+    }
+    Arc::new(set)
 }
 
 /// for ResetFromTcp, ResponseFromUdpBlackhole: all IpAddr should outside the GFW, e.g. non-China IPs.
@@ -190,6 +209,10 @@ pub enum DomainSpoofDetectMethod {
     /// [recommended: this definitely a (90%) reliable way, but false-negative is possible, because maybe some blocked domain not in this gfwlist]
     /// a pre-defined list of GFW-blocked domains. if any domain in this list, then assume that domain is blocked. this does not requires Internet access.
     GfwList,
+
+    /// [recommended: this definitely a (90%) reliable way, but false-negative is possible, because maybe some blocked domain in this chinalist]
+    /// a pre-defined list of China domains. if any domain in this list, then assume that domain is not blocked. this does not requires Internet access.
+    ChinaList,
 
     /// [may not recommended (80%) reliable: this behavior may changes in future]
     /// Send UDP query with "domain.com IN SOA" to local DNS servers (any server located in China), if received response is empty (without records), then assume that domain is blocked. because these DNS servers is inside the GFW, so their query is spoofed by GFW (even rdtype is not A or AAAA), so they should received a answer with A record, this is not valid response of SOA query (due to rdtype mis-match). and the most of domains should have SOA records even NXDOMAIN.
@@ -245,7 +268,7 @@ impl DomainSpoofDetectMethod {
 
     pub const fn is_dynamic(&self) -> bool {
         match self {
-            Self::GfwList => false,
+            Self::GfwList | Self::ChinaList => false,
             _ => true
         }
     }
@@ -253,14 +276,26 @@ impl DomainSpoofDetectMethod {
         ! self.is_dynamic()
     }
 
-    pub fn best_dynamic() -> (Self, DomainSpoofDetectData) {
+    pub fn reset_from_tcp() -> (Self, DomainSpoofDetectData) {
         let ips = outside_dns_list();
         let list = DomainSpoofDetectAddressList::new(GfwSide::Outside, Some(ips.iter().copied()));
         let data = DomainSpoofDetectData::Address(list);
         (Self::ResetFromTcp, data)
     }
-    pub fn best_static() -> (Self, DomainSpoofDetectData) {
-        (Self::GfwList, todo!())
+
+    pub fn best_dynamic() -> (Self, DomainSpoofDetectData) {
+        Self::reset_from_tcp()
+    }
+
+    pub fn gfwlist() -> (Self, DomainSpoofDetectData) {
+        let list = DomainSpoofDetectPredefinedList::outside(None::<Vec<dns::Name>>);
+        let data = DomainSpoofDetectData::Domain(list);
+        (Self::GfwList, data)
+    }
+    pub fn chinalist() -> (Self, DomainSpoofDetectData) {
+        let list = DomainSpoofDetectPredefinedList::inside(None::<Vec<dns::Name>>);
+        let data = DomainSpoofDetectData::Domain(list);
+        (Self::ChinaList, data)
     }
 }
 
@@ -280,7 +315,7 @@ pub struct DomainSpoofDetectAddressList {
 }
 
 impl DomainSpoofDetectAddressList {
-    pub fn new(side: GfwSide, maybe_addrs: Option<impl Iterator<Item=SocketAddr>>) -> Self {
+    pub fn new(side: GfwSide, maybe_addrs: Option<impl IntoIterator<Item=SocketAddr>>) -> Self {
         let list = Arc::new(scc::HashSet::new());
         if let Some(addrs) = maybe_addrs {
             for addr in addrs {
@@ -303,23 +338,66 @@ impl DomainSpoofDetectAddressList {
         Self { list, side }
     }
 
-    pub fn inside(maybe_addrs: Option<impl Iterator<Item=SocketAddr>>) -> Self {
+    pub fn inside(maybe_addrs: Option<impl IntoIterator<Item=SocketAddr>>) -> Self {
         Self::new(GfwSide::Inside, maybe_addrs)
     }
 
-    pub fn outside(maybe_addrs: Option<impl Iterator<Item=SocketAddr>>) -> Self {
+    pub fn outside(maybe_addrs: Option<impl IntoIterator<Item=SocketAddr>>) -> Self {
         Self::new(GfwSide::Outside, maybe_addrs)
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct DomainSpoofDetectPredefinedList {
+    list: Arc<scc::HashSet<dns::Name>>,
+    side: GfwSide,
+}
+
+impl DomainSpoofDetectPredefinedList {
+    /// domain must ends with "."
+    pub async fn contains(&self, domain: &dns::Name) -> bool {
+        self.list.any_async(|it| {
+            domain.trim_to(it.num_labels() as usize).borrow() == it
+        }).await
+    }
+
+    pub fn new(side: GfwSide, maybe_domains: Option<impl IntoIterator<Item=dns::Name>>) -> Self {
+        let list;
+        if let Some(domains) = maybe_domains {
+            list = Arc::new(scc::HashSet::new());
+            for domain in domains {
+                let _ = list.insert(domain);
+            }
+        } else {
+            list =
+                if side == GfwSide::Inside {
+                    scc_hashset_of_inside_domains()
+                } else {
+                    scc_hashset_of_outside_domains()
+                };
+        }
+
+        Self { list, side }
+    }
+
+    pub fn inside(maybe_domains: Option<impl IntoIterator<Item=dns::Name>>) -> Self {
+        Self::new(GfwSide::Inside, maybe_domains)
+    }
+
+    pub fn outside(maybe_domains: Option<impl IntoIterator<Item=dns::Name>>) -> Self {
+        Self::new(GfwSide::Outside, maybe_domains)
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum DomainSpoofDetectData {
     Address(DomainSpoofDetectAddressList),
-    Domain(Arc<scc::HashSet<String>>),
+    Domain(DomainSpoofDetectPredefinedList),
     None,
 }
 impl DomainSpoofDetectData {
-    pub fn as_domain(&self) -> Option<Arc<scc::HashSet<String>>> {
+    pub fn as_domain(&self) -> Option<DomainSpoofDetectPredefinedList> {
         match self {
             Self::Domain(domains) => {
                 Some(domains.clone())
@@ -440,8 +518,17 @@ impl DomainSpoofDetector {
                     anyhow::bail!("method requires a list of IPs, but data != Address");
                 }
             },
-            GfwList => {
-                if let DomainSpoofDetectData::Domain(_) = data { // that is ok
+            GfwList | ChinaList => {
+                if let DomainSpoofDetectData::Domain(ref list) = data {
+                    if method == GfwList {
+                        if list.side != GfwSide::Outside {
+                            anyhow::bail!("method requires a list of outside domains, but this domain list is inside");
+                        }
+                    } else {
+                        if list.side != GfwSide::Inside {
+                            anyhow::bail!("method requires a list of inside domains, but this domain list is outside");
+                        }
+                    }
                 } else {
                     anyhow::bail!("method requires a list of domains, but data != Domains");
                 }
@@ -693,7 +780,20 @@ impl DomainSpoofDetector {
                 todo!();
             },
             GfwList => {
-                Ok(self.data.as_domain().unwrap().contains_async(domain).await)
+                let domain = dns::Name::from_str_relaxed(domain)?;
+                if self.data.as_domain().unwrap().contains(&domain).await {
+                    Ok(true)
+                } else {
+                    anyhow::bail!("cannot detect domain is_spoofed or not: it is not in the GfwList, this is for avoid false-negative.");
+                }
+            },
+            ChinaList => {
+                let domain = dns::Name::from_str_relaxed(domain)?;
+                if self.data.as_domain().unwrap().contains(&domain).await {
+                    Ok(false)
+                } else {
+                    anyhow::bail!("cannot detect domain is_spoofed or not: it is not in the ChinaList, this is for avoid false-positive.");
+                }
             },
         }
     }

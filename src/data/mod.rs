@@ -4,6 +4,9 @@ pub mod outside_dns;
 pub mod inside_ips;
 pub mod outside_ips;
 
+pub mod inside_domains;
+pub mod outside_domains;
+
 pub(crate) mod helper;
 pub(crate) use helper::*;
 
@@ -305,6 +308,25 @@ pub fn outside_dns_list_by_family(family: u8) -> Vec<SocketAddr> {
             panic!("invalid family provided: it must be 4 or 6.");
         }
     }
+}
+
+pub fn inside_domain_list() -> Vec<String> {
+    inside_domains::LIST.iter().map(|domain| {
+        let mut domain = domain.to_string();
+        if ! domain.ends_with('.') {
+            domain.push('.');
+        }
+        domain
+    }).collect()
+}
+pub fn outside_domain_list() -> Vec<String> {
+    outside_domains::LIST.iter().map(|domain| {
+        let mut domain = domain.to_string();
+        if ! domain.ends_with('.') {
+            domain.push('.');
+        }
+        domain
+    }).collect()
 }
 
 #[cfg(test)]

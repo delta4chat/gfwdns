@@ -108,9 +108,11 @@ async fn main_async() -> anyhow::Result<()> {
             .local(local)
             .global(global);
 
+        /*
         if let Some(method) = opt.detect_method {
-            b = b.detect_method(method);
+            b = b.detect_method_data(method, data);
         }
+        */
 
         b.build().await?
     };
