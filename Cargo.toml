@@ -27,7 +27,7 @@ serde = { version = "1.0.216", features = ["derive", "std", "alloc", "rc"] }
 smol = "2.0.2"
 smolscale2 = "0.6.0"
 smoltimeout = "0.6.2"
-sqlx = { optional = true, version = "0.8.2", features = ["runtime-async-std", "sqlite"], default-features = false }
+sqlx = { optional = true, version = "0.8.3", features = ["runtime-async-std", "sqlite"], default-features = false }
 
 [profile.dev]
 panic = "unwind"
