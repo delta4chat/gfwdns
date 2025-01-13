@@ -14,7 +14,7 @@ sqlite=["dep:sqlx"]
 [dependencies]
 anyhow = { version = "1.0.94", features = ["backtrace"] }
 clap = { version = "4.5.23", features = ["derive"] }
-directories = "5.0.1"
+directories = "6.0.0"
 env_logger = "0.11.6"
 fastrand = "2.3.0"
 hickory-proto = { version = "0.24.2", default-features = false }
