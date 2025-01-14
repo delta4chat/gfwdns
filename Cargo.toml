@@ -18,7 +18,7 @@ directories = "5.0.1"
 env_logger = "0.11.6"
 fastrand = "2.3.0"
 hickory-proto = { version = "0.24.2", default-features = false }
-log = "0.4.22"
+log = "0.4.25"
 once_cell = { version = "1.20.2", features = ["parking_lot", "portable-atomic"] }
 portable-atomic = "1.10.0"
 postcard = { version = "1.1.1", features = ["use-std"] }
