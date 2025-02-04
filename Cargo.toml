@@ -13,7 +13,7 @@ sqlite=["dep:sqlx"]
 
 [dependencies]
 anyhow = { version = "1.0.94", features = ["backtrace"] }
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.5.28", features = ["derive"] }
 directories = "5.0.1"
 env_logger = "0.11.6"
 fastrand = "2.3.0"
