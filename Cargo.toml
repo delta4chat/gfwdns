@@ -17,7 +17,7 @@ clap = { version = "4.5.23", features = ["derive"] }
 directories = "5.0.1"
 env_logger = "0.11.6"
 fastrand = "2.3.0"
-hickory-proto = { version = "0.24.2", default-features = false }
+hickory-proto = { version = "0.24.3", default-features = false }
 log = "0.4.22"
 once_cell = { version = "1.20.2", features = ["parking_lot", "portable-atomic"] }
 portable-atomic = "1.10.0"
