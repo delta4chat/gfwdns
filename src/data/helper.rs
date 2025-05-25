@@ -1,22 +1,36 @@
 use crate::*;
 
-pub(crate) const fn v4(a: u8, b: u8, c: u8, d: u8, cidr: u8) -> Subnet {
-    Subnet::new(IpAddr::V4(Ipv4Addr::new(a, b, c, d)), cidr)
-}
-pub(crate) const fn v6(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16, cidr: u8) -> Subnet {
-    Subnet::new(IpAddr::V6(Ipv6Addr::new(a, b, c, d, e, f, g, h)), cidr)
-}
-
-#[macro_export]
-macro_rules! m4 {
-    ($($n:ident, $v:expr $(,)?)*) => {
-        $(const $n:u8=$v;)*
+pub const fn ip_split<const V4: usize, const V6: usize>(ips: &[Subnet])
+    -> ([Subnet; V4], [Subnet; V6])
+{
+    let ips_len = ips.len();
+    if ips_len != (V4 + V6) {
+        panic!("corrupted data");
     }
-}
 
-#[macro_export]
-macro_rules! m6 {
-    ($($n:ident, $v:expr $(,)?)*) => {
-        $(const $n:u16=$v;)*
+    let mut ipv4 = [Subnet::default(); V4];
+    let mut ipv6 = [Subnet::default(); V6];
+
+    let mut pos4 = 0;
+    let mut pos6 = 0;
+
+    let mut ip;
+    let mut i = 0;
+
+    while i < ips.len() {
+        ip = ips[i];
+        if ip.is_ipv4() {
+            ipv4[pos4] = ip;
+            pos4 += 1;
+        } else if ip.is_ipv6() {
+            ipv6[pos6] = ip;
+            pos6 += 1;
+        }
+        i += 1;
     }
+    
+    assert!(pos4 == V4);
+    assert!(pos6 == V6);
+
+    (ipv4, ipv6)
 }

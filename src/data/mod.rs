@@ -18,6 +18,85 @@ pub struct Subnet {
     cidr: u8, // 0~32 for IPv4, 0~128 for IPv6.
 }
 impl Subnet {
+    pub const fn parse<const N: usize>(data: &[u8], len4: usize) -> [Self; N] {
+        Self::parse_skip(data, len4, 0)
+    }
+
+    pub const fn parse_skip<const N: usize>(data: &[u8], len4: usize, skip: usize) -> [Self; N] {
+        let data_len = data.len();
+        if data_len < skip {
+            panic!("corrupted data!");
+        }
+        let data_len = data_len - skip;
+
+        if data_len < (len4 * 5) {
+            panic!("corrupted ipv4 data!");
+        }
+
+        let len6 = {
+            let b6 = data_len - (len4 * 5);
+            if (b6 % 17) != 0 {
+                panic!("corrupted ipv6 data!");
+            }
+            b6 / 17
+        };
+
+        if data_len != (len4 * 5) + (len6 * 17) {
+            panic!("corrupted data!");
+        }
+
+        if N != (len4 + len6) {
+            panic!("array length <const N> too short!");
+        }
+
+        let mut out = [Self::default(); N];
+
+        let mut pos = skip;
+        let mut i = 0;
+        let mut ii = 0;
+        while i < len4 {
+            out[ii] =
+                Self::new(
+                    // Ipv4    + CIDR
+                    // 4 bytes + 1 bytes
+                    IpAddr::V4(Ipv4Addr::new(data[pos], data[pos+1], data[pos+2], data[pos+3])),
+                    data[pos+4]
+                );
+            pos += 5;
+            i += 1;
+            ii += 1;
+        }
+
+        i = 0;
+        while i < len6 {
+            out[ii] =
+                Self::new(
+                    // Ipv6     + CIDR
+                    // 16 bytes + 1 bytes
+                    IpAddr::V6(Ipv6Addr::new(
+                        u16::from_be_bytes([data[pos], data[pos+1]]),
+                        u16::from_be_bytes([data[pos+2], data[pos+3]]),
+                        u16::from_be_bytes([data[pos+4], data[pos+5]]),
+                        u16::from_be_bytes([data[pos+6], data[pos+7]]),
+                        u16::from_be_bytes([data[pos+8], data[pos+9]]),
+                        u16::from_be_bytes([data[pos+10], data[pos+11]]),
+                        u16::from_be_bytes([data[pos+12], data[pos+13]]),
+                        u16::from_be_bytes([data[pos+14], data[pos+15]])
+                    )),
+                    data[pos+16]
+                );
+            pos += 17;
+            i += 1;
+            ii += 1;
+        }
+
+        out
+    }
+
+    pub const fn default() -> Self {
+        Self::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)
+    }
+
     pub const fn try_new(ip: IpAddr, cidr: u8) -> Option<Self> {
         let ip = ip.to_canonical();
 
@@ -37,8 +116,24 @@ impl Subnet {
         }
     }
 
+    pub const fn ip<'a>(&'a self) -> &'a IpAddr {
+        &self.ip
+    }
+
+    pub const fn cidr(&self) -> u8 {
+        self.cidr
+    }
+
+    pub const fn is_ipv4(&self) -> bool {
+        self.ip().is_ipv4()
+    }
+
+    pub const fn is_ipv6(&self) -> bool {
+        self.ip().is_ipv6()
+    }
+
     pub const fn is_valid(&self) -> bool {
-        if self.ip.is_ipv4() && self.cidr > 32 {
+        if self.is_ipv4() && self.cidr > 32 {
             false
         } else if self.cidr > 128 {
             false
@@ -228,11 +323,11 @@ pub fn random_inside_ip() -> IpAddr {
 pub fn random_inside_ip_by_family(family: u8) -> IpAddr {
     match family {
         4 => {
-            let subnet = inside_ips::IPV4_FROM_GEOIP[fastrand::usize(0..inside_ips::IPV4_FROM_GEOIP.len())];
+            let subnet = inside_ips::IPV4_LIST[fastrand::usize(0..inside_ips::IPV4_LEN)];
             subnet.random().unwrap()
         },
         6 => {
-            let subnet = inside_ips::IPV6_FROM_GEOIP[fastrand::usize(0..inside_ips::IPV6_FROM_GEOIP.len())];
+            let subnet = inside_ips::IPV6_LIST[fastrand::usize(0..inside_ips::IPV6_LEN)];
             subnet.random().unwrap()
         },
         _ => {
@@ -255,11 +350,11 @@ pub fn random_outside_ip() -> IpAddr {
 pub fn random_outside_ip_by_family(family: u8) -> IpAddr {
     match family {
         4 => {
-            let subnet = outside_ips::IPV4_FROM_GEOIP[fastrand::usize(0..outside_ips::IPV4_FROM_GEOIP.len())];
+            let subnet = outside_ips::IPV4_LIST[fastrand::usize(0..outside_ips::IPV4_LEN)];
             subnet.random().unwrap()
         },
         6 => {
-            let subnet = outside_ips::IPV6_FROM_GEOIP[fastrand::usize(0..outside_ips::IPV6_FROM_GEOIP.len())];
+            let subnet = outside_ips::IPV6_LIST[fastrand::usize(0..outside_ips::IPV6_LEN)];
             subnet.random().unwrap()
         },
         _ => {

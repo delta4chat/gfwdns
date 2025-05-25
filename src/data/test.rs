@@ -1,6 +1,12 @@
 use crate::*;
 
 #[test]
+fn subnet_parse() {
+    let data = b"\x7f\x00\x00\x00\x08\x0a\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x80";
+    let subnets: [_; 3] = dbg!(Subnet::parse(data, 2));
+}
+
+#[test]
 fn ip_list() {
     std::thread::sleep(Duration::from_secs(1));
     dbg!(inside_ips::IPV4_FROM_GEOIP);

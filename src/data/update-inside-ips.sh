@@ -15,9 +15,10 @@ type rm
 type mv
 
 outdir="$(realpath .)"
-outfile="${outdir}/inside_ips.rs"
+outfile="${outdir}/inside_ips.bin"
+outinfo="${outdir}/inside_ips.txt"
 
-py="${outdir}/ip2b63.py"
+py="${outdir}/ip2bin.py"
 
 tmp="$(mktemp -d -t gfwdnsChinaIpUpdater.XXXXXXXX)"
 trap "rm -rfv $tmp" EXIT
@@ -31,16 +32,12 @@ cd country
 cd cn
 
 {
-	echo "#![allow(non_upper_case_globals)]"
-    echo "use crate::*;"
+    cat aggregated.json | jq -r '.subnets.ipv4[]' > txt.tmp.out
+    cat aggregated.json | jq -r '.subnets.ipv6[]' >> txt.tmp.out
 
-    echo "/* CN: IPv4+IPv6 */"
+    cat txt.tmp.out | sort -u | tee txt.tmp.out.2 | python3 $py
+} > bin.tmp.out
 
-	cat aggregated.json | jq -r '.subnets.ipv4[]' > ips.txt
-	cat aggregated.json | jq -r '.subnets.ipv6[]' >> ips.txt
-	
-	cat ips.txt | sort -u | python3 $py
-} > rs.tmp.out
-
-mv rs.tmp.out $outfile
+mv bin.tmp.out $outfile
+mv txt.tmp.out.2 $outinfo
 
