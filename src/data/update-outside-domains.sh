@@ -14,7 +14,7 @@ type rm
 type mv
 
 outdir="$(realpath .)"
-outfile="${outdir}/outside_domains.rs"
+outfile="${outdir}/outside_domains.txt"
 
 py="${outdir}/gfwlist2domains.py"
 
@@ -25,15 +25,8 @@ cd $tmp
 curl https://github.com/gfwlist/gfwlist/raw/refs/heads/master/gfwlist.txt -v -O -L $@
 
 {
-    #echo "use crate::*;"
+    cat gfwlist.txt | base64 -d | python3 $py | sort -u
+} > txt.tmp.out
 
-	echo "/* Blocked Domains (GfwList) */"
-	echo "pub const LIST: &'static [&'static str] = &["
-
-	cat gfwlist.txt | base64 -d | python3 $py | sort -u
-
-	echo "];"
-} > rs.tmp.out
-
-mv rs.tmp.out $outfile
+mv txt.tmp.out $outfile
 

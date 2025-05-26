@@ -9,12 +9,18 @@ fn subnet_parse() {
 #[test]
 fn ip_list() {
     std::thread::sleep(Duration::from_secs(1));
-    dbg!(inside_ips::IPV4_FROM_GEOIP);
-    dbg!(inside_ips::IPV6_FROM_GEOIP);
+    dbg!(inside_ips::IPV4_LIST.iter().take(10).collect::<Vec<_>>());
+    dbg!(inside_ips::IPV6_LIST.iter().take(10).collect::<Vec<_>>());
 
-    dbg!(outside_ips::IPV4_FROM_GEOIP);
-    dbg!(outside_ips::IPV6_FROM_GEOIP);
+    dbg!(outside_ips::IPV4_LIST.iter().take(10).collect::<Vec<_>>());
+    dbg!(outside_ips::IPV6_LIST.iter().take(10).collect::<Vec<_>>());
+}
 
+#[test]
+fn domain_list() {
+    std::thread::sleep(Duration::from_secs(1));
+    dbg!(inside_domains::DOMAIN_LIST.iter().take(10).collect::<Vec<_>>());
+    dbg!(outside_domains::DOMAIN_LIST.iter().take(10).collect::<Vec<_>>());
 }
 
 #[test]

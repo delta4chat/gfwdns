@@ -58,4 +58,4 @@ for f in parse_filterlist(sys.stdin.read().split('\n')):
 
         if v not in seen:
             seen.add(v)
-            print('"', v, '",', sep='')
+            print(v)

@@ -5,6 +5,7 @@ pub struct Database {
     pool: Arc<SqlitePool>,
 }
 impl Database {
+    #[inline(always)]
     pub async fn new(db_file: impl AsRef<Path>) -> anyhow::Result<Self> {
         let db_file = db_file.as_ref();
 
@@ -33,6 +34,7 @@ impl Database {
         })
     }
 
+    #[inline(always)]
     pub async fn load_all(&self) -> Vec<DomainStatusInfo> {
         let mut out = Vec::new();
         let mut bads = Vec::new();
@@ -121,6 +123,7 @@ impl Database {
         out
     }
 
+    #[inline(always)]
     pub async fn load(&self, domain: &str) -> anyhow::Result<DomainStatusInfo> {
         let ret = self._load(domain).await;
 
@@ -141,6 +144,7 @@ impl Database {
         }
     }
 
+    #[inline(always)]
     async fn _load(&self, domain: &str) -> anyhow::Result<Option<DomainStatusInfo>> {
         let maybe_line =
             sqlx::query("SELECT * FROM gfwdns_cache_v1 WHERE domain = ?")
@@ -162,6 +166,7 @@ impl Database {
         Ok(Some(info))
     }
 
+    #[inline(always)]
     pub async fn store(&self, domain: &str, info: DomainStatusInfo) -> anyhow::Result<()> {
         let info: Vec<u8> = postcard::to_allocvec(&info)?;
 

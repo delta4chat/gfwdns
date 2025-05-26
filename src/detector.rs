@@ -117,6 +117,7 @@ pub const ROOT_SERVERS_IPV6: [(&'static str, Ipv6Addr); ROOT_SERVERS_LEN] = {
     list
 };
 
+#[inline(always)]
 pub const fn root_servers_addr_by_family(family: u8) -> [SocketAddr; ROOT_SERVERS_LEN] {
     let mut list = [const { SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0) }; ROOT_SERVERS_LEN];
 
@@ -135,6 +136,8 @@ pub const fn root_servers_addr_by_family(family: u8) -> [SocketAddr; ROOT_SERVER
 
     list
 }
+
+#[inline(always)]
 pub const fn root_servers_addr() -> [SocketAddr; ROOT_SERVERS_LEN * 2] {
     let mut list = [const { SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0) }; ROOT_SERVERS_LEN * 2];
 
@@ -161,6 +164,7 @@ pub const fn root_servers_addr() -> [SocketAddr; ROOT_SERVERS_LEN * 2] {
     list
 }
 
+#[inline(always)]
 pub fn scc_hashset_of_root_servers() -> Arc<scc::HashSet<SocketAddr>> {
     let set = scc::HashSet::new();
     for adr in root_servers_addr() {
@@ -169,6 +173,7 @@ pub fn scc_hashset_of_root_servers() -> Arc<scc::HashSet<SocketAddr>> {
     Arc::new(set)
 }
 
+#[inline(always)]
 pub fn scc_hashset_of_inside_domains() -> Arc<scc::HashSet<dns::Name>> {
     let set = scc::HashSet::new();
     for domain in inside_domain_list().iter() {
@@ -178,6 +183,8 @@ pub fn scc_hashset_of_inside_domains() -> Arc<scc::HashSet<dns::Name>> {
     }
     Arc::new(set)
 }
+
+#[inline(always)]
 pub fn scc_hashset_of_outside_domains() -> Arc<scc::HashSet<dns::Name>> {
     let set = scc::HashSet::new();
     for domain in outside_domain_list().iter() {
@@ -219,13 +226,14 @@ pub enum DomainSpoofDetectMethod {
     EmptySoaFromLocal,
 
     /// [not recommended: this may (95%) reliable but DDoS to Root NS]
-    /// Send UDP qeury with "domain.com CH A" (rdclass=Chaos, rdtype=A) to 13 root servers, if received any of IP address (A or AAAA), then assume that domain is blocked. because any of *.root-servers.net does not handle Chaos, and does not respond any IP address other than them self (*.root-servers.net) or GTLD/CCTLD (.com / .org / .net / .cc, etc.).
+    /// Send UDP qeury with "domain.com CH A" (rdclass=Chaos, rdtype=A) to 13 root servers, if received any of IP address (A or AAAA), then assume that domain is blocked. because any of *.root-servers.net does not handle Chaos, and does not respond any IP address other than them self (*.root-servers.net) or the name servers of GTLD/CCTLD (.com / .org / .net / .ai, etc.).
     ResponseIpFromRootNS,
 }
 
 impl core::str::FromStr for DomainSpoofDetectMethod {
     type Err = anyhow::Error;
 
+    #[inline(always)]
     fn from_str(s: &str) -> anyhow::Result<Self> {
         Self::parse_str(s)
     }
@@ -234,12 +242,14 @@ impl core::str::FromStr for DomainSpoofDetectMethod {
 impl TryFrom<&str> for DomainSpoofDetectMethod {
     type Error = anyhow::Error;
 
+    #[inline(always)]
     fn try_from(s: &str) -> anyhow::Result<Self> {
         Self::parse_str(s)
     }
 }
 
 impl DomainSpoofDetectMethod {
+    #[inline(always)]
     pub fn parse_str(method: &str) -> anyhow::Result<Self> {
         Ok(match method.replace("_", "-").replace(".", "-").replace(" ", "-").to_lowercase().as_str() {
             "tcp-rst" | "tcp-reset"
@@ -269,16 +279,20 @@ impl DomainSpoofDetectMethod {
         })
     }
 
+    #[inline(always)]
     pub const fn is_dynamic(&self) -> bool {
         match self {
             Self::GfwList | Self::ChinaList => false,
             _ => true
         }
     }
+
+    #[inline(always)]
     pub const fn is_static(&self) -> bool {
         ! self.is_dynamic()
     }
 
+    #[inline(always)]
     pub fn reset_from_tcp() -> (Self, DomainSpoofDetectData) {
         let ips = outside_dns_list();
         let list = DomainSpoofDetectAddressList::outside(Some(ips));
@@ -286,15 +300,19 @@ impl DomainSpoofDetectMethod {
         (Self::ResetFromTcp, data)
     }
 
+    #[inline(always)]
     pub fn best_dynamic() -> (Self, DomainSpoofDetectData) {
         Self::reset_from_tcp()
     }
 
+    #[inline(always)]
     pub fn gfwlist() -> (Self, DomainSpoofDetectData) {
         let list = DomainSpoofDetectPredefinedList::outside(None::<Vec<dns::Name>>);
         let data = DomainSpoofDetectData::Domain(list);
         (Self::GfwList, data)
     }
+
+    #[inline(always)]
     pub fn chinalist() -> (Self, DomainSpoofDetectData) {
         let list = DomainSpoofDetectPredefinedList::inside(None::<Vec<dns::Name>>);
         let data = DomainSpoofDetectData::Domain(list);
@@ -318,6 +336,7 @@ pub struct DomainSpoofDetectAddressList {
 }
 
 impl DomainSpoofDetectAddressList {
+    #[inline(always)]
     pub fn new(side: GfwSide, maybe_addrs: Option<impl IntoIterator<Item=SocketAddr>>) -> Self {
         let list = Arc::new(scc::HashSet::new());
         if let Some(addrs) = maybe_addrs {
@@ -341,10 +360,12 @@ impl DomainSpoofDetectAddressList {
         Self { list, side }
     }
 
+    #[inline(always)]
     pub fn inside(maybe_addrs: Option<impl IntoIterator<Item=SocketAddr>>) -> Self {
         Self::new(GfwSide::Inside, maybe_addrs)
     }
 
+    #[inline(always)]
     pub fn outside(maybe_addrs: Option<impl IntoIterator<Item=SocketAddr>>) -> Self {
         Self::new(GfwSide::Outside, maybe_addrs)
     }
@@ -359,12 +380,14 @@ pub struct DomainSpoofDetectPredefinedList {
 
 impl DomainSpoofDetectPredefinedList {
     /// domain must ends with "."
+    #[inline(always)]
     pub async fn contains(&self, domain: &dns::Name) -> bool {
         self.list.any_async(|it| {
             domain.trim_to(it.num_labels() as usize).borrow() == it
         }).await
     }
 
+    #[inline(always)]
     pub fn new(side: GfwSide, maybe_domains: Option<impl IntoIterator<Item=dns::Name>>) -> Self {
         let list;
         if let Some(domains) = maybe_domains {
@@ -384,10 +407,12 @@ impl DomainSpoofDetectPredefinedList {
         Self { list, side }
     }
 
+    #[inline(always)]
     pub fn inside(maybe_domains: Option<impl IntoIterator<Item=dns::Name>>) -> Self {
         Self::new(GfwSide::Inside, maybe_domains)
     }
 
+    #[inline(always)]
     pub fn outside(maybe_domains: Option<impl IntoIterator<Item=dns::Name>>) -> Self {
         Self::new(GfwSide::Outside, maybe_domains)
     }
@@ -400,6 +425,7 @@ pub enum DomainSpoofDetectData {
     None,
 }
 impl DomainSpoofDetectData {
+    #[inline(always)]
     pub fn as_domain(&self) -> Option<DomainSpoofDetectPredefinedList> {
         match self {
             Self::Domain(domains) => {
@@ -411,6 +437,7 @@ impl DomainSpoofDetectData {
         }
     }
 
+    #[inline(always)]
     pub fn as_address(&self) -> Option<Arc<scc::HashSet<SocketAddr>>> {
         match self {
             Self::Address(addrs) => {
@@ -421,6 +448,8 @@ impl DomainSpoofDetectData {
             }
         }
     }
+
+    #[inline(always)]
     pub async fn select_addr_by_family(&self, family: u8) -> Option<SocketAddr> {
         let addrs = self.as_address()?;
         let addrs = {
@@ -453,6 +482,8 @@ impl DomainSpoofDetectData {
             }
         }
     }
+
+    #[inline(always)]
     pub async fn select_addr(&self) -> Option<SocketAddr> {
         let family =
             if DISABLE_IPV6.load(Relaxed) {
@@ -466,6 +497,7 @@ impl DomainSpoofDetectData {
         self.select_addr_by_family(family).await
     }
 
+    #[inline(always)]
     pub async fn addrs(&self) -> Vec<SocketAddr> {
         let mut out = Vec::new();
         let addrs =
@@ -489,6 +521,7 @@ pub struct DomainSpoofDetector {
     cache: DomainStatusCache,
 }
 impl DomainSpoofDetector {
+    #[inline(always)]
     pub async fn new(
         method: DomainSpoofDetectMethod,
         data: DomainSpoofDetectData,
@@ -550,6 +583,7 @@ impl DomainSpoofDetector {
         })
     }
 
+    #[inline(always)]
     fn _gen_dns_query(domain: &str, rdclass: u16, rdtype: u16) -> anyhow::Result<dns::Message> {
         Ok(
             dns::Message::new()
@@ -574,6 +608,7 @@ impl DomainSpoofDetector {
     /// cached detect: return bool means "is_spoofed":
     /// 1. if returns true, this domain is blocked by DNS spoofing.
     /// 2. if returns false, this domain is not blocked by DNS spoofing. NOTE: this does not check other censorship methods (such as TLS-SNI-TCP-RST, IP-blackhole, or HTTP-TCP-RST)
+    #[inline(always)]
     pub async fn detect(&self, domain: impl ToString) -> anyhow::Result<bool> {
         let mut domain = domain.to_string().to_lowercase();
         if ! domain.ends_with('.') {
@@ -602,6 +637,7 @@ impl DomainSpoofDetector {
     }
 
     /// un-cached detect
+    #[inline(always)]
     async fn _detect(&self, domain: &str) -> anyhow::Result<bool> {
         use DomainSpoofDetectMethod::*;
         match &self.method {

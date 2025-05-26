@@ -12,7 +12,7 @@ type rm
 type mv
 
 outdir="$(realpath .)"
-outfile="${outdir}/inside_domains.rs"
+outfile="${outdir}/inside_domains.txt"
 
 tmp="$(mktemp -d -t gfwdnsChinaDomainsUpdater.XXXXXXXX)"
 trap "rm -rfv $tmp" EXIT
@@ -21,18 +21,8 @@ cd $tmp
 curl https://github.com/carrnot/china-domain-list/raw/refs/heads/release/domain.txt -v -O -L $@
 
 {
-    #echo "use crate::*;"
+    cat domain.txt | grep -v -F '"' | sort -u
+} > txt.tmp.out
 
-	echo "/* Inside Domains (ChinaList) */"
-	echo "pub const LIST: &'static [&'static str] = &["
-
-	for domain in $(cat domain.txt | sort -u | grep -v -F '"')
-	do
-		echo "\"${domain}\","
-	done
-
-	echo "];"
-} > rs.tmp.out
-
-mv rs.tmp.out $outfile
+mv txt.tmp.out $outfile
 

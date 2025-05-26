@@ -18,10 +18,12 @@ pub struct Subnet {
     cidr: u8, // 0~32 for IPv4, 0~128 for IPv6.
 }
 impl Subnet {
+    #[inline(always)]
     pub const fn parse<const N: usize>(data: &[u8], len4: usize) -> [Self; N] {
         Self::parse_skip(data, len4, 0)
     }
 
+    #[inline(always)]
     pub const fn parse_skip<const N: usize>(data: &[u8], len4: usize, skip: usize) -> [Self; N] {
         let data_len = data.len();
         if data_len < skip {
@@ -93,10 +95,12 @@ impl Subnet {
         out
     }
 
+    #[inline(always)]
     pub const fn default() -> Self {
         Self::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)
     }
 
+    #[inline(always)]
     pub const fn try_new(ip: IpAddr, cidr: u8) -> Option<Self> {
         let ip = ip.to_canonical();
 
@@ -108,6 +112,8 @@ impl Subnet {
             None
         }
     }
+
+    #[inline(always)]
     pub const fn new(ip: IpAddr, cidr: u8) -> Self {
         if let Some(this) = Self::try_new(ip, cidr) {
             this
@@ -116,22 +122,27 @@ impl Subnet {
         }
     }
 
+    #[inline(always)]
     pub const fn ip<'a>(&'a self) -> &'a IpAddr {
         &self.ip
     }
 
+    #[inline(always)]
     pub const fn cidr(&self) -> u8 {
         self.cidr
     }
 
+    #[inline(always)]
     pub const fn is_ipv4(&self) -> bool {
         self.ip().is_ipv4()
     }
 
+    #[inline(always)]
     pub const fn is_ipv6(&self) -> bool {
         self.ip().is_ipv6()
     }
 
+    #[inline(always)]
     pub const fn is_valid(&self) -> bool {
         if self.is_ipv4() && self.cidr > 32 {
             false
@@ -142,6 +153,7 @@ impl Subnet {
         }
     }
 
+    #[inline(always)]
     pub const fn contains(&self, ip: IpAddr) -> bool {
         if ! self.is_valid() {
             return false;
@@ -171,6 +183,7 @@ impl Subnet {
         }
     }
 
+    #[inline(always)]
     pub /* const */ fn fill(&self, out: &mut [IpAddr]) -> usize {
         let range =
             if let Some(v) = self.range() {
@@ -231,6 +244,7 @@ impl Subnet {
         }
     }
 
+    #[inline(always)]
     pub const fn range(&self) -> Option<(IpAddr, IpAddr)> {
         if ! self.is_valid() {
             return None;
@@ -273,6 +287,7 @@ impl Subnet {
     }
 
     /// generate random IP with in this range
+    #[inline(always)]
     pub fn random(&self) -> Option<IpAddr> {
         if ! self.is_valid() {
             return None;
@@ -309,6 +324,7 @@ impl Subnet {
     }
 }
 
+#[inline(always)]
 pub fn random_inside_ip() -> IpAddr {
     random_inside_ip_by_family(
         if DISABLE_IPV6.load(Relaxed) {
@@ -320,6 +336,8 @@ pub fn random_inside_ip() -> IpAddr {
         }
     )
 }
+
+#[inline(always)]
 pub fn random_inside_ip_by_family(family: u8) -> IpAddr {
     match family {
         4 => {
@@ -336,6 +354,7 @@ pub fn random_inside_ip_by_family(family: u8) -> IpAddr {
     }
 }
 
+#[inline(always)]
 pub fn random_outside_ip() -> IpAddr {
     random_outside_ip_by_family(
         if DISABLE_IPV6.load(Relaxed) {
@@ -347,6 +366,8 @@ pub fn random_outside_ip() -> IpAddr {
         }
     )
 }
+
+#[inline(always)]
 pub fn random_outside_ip_by_family(family: u8) -> IpAddr {
     match family {
         4 => {
@@ -363,6 +384,7 @@ pub fn random_outside_ip_by_family(family: u8) -> IpAddr {
     }
 }
 
+#[inline(always)]
 pub fn inside_dns_list() -> Vec<SocketAddr> {
     if DISABLE_IPV6.load(Relaxed) {
         inside_dns_list_by_family(4)
@@ -370,6 +392,8 @@ pub fn inside_dns_list() -> Vec<SocketAddr> {
         inside_dns::IP_LIST.iter().map(|ip| { SocketAddr::new(*ip, 53) }).collect()
     }
 }
+
+#[inline(always)]
 pub fn inside_dns_list_by_family(family: u8) -> Vec<SocketAddr> {
     match family {
         4 => {
@@ -384,6 +408,7 @@ pub fn inside_dns_list_by_family(family: u8) -> Vec<SocketAddr> {
     }
 }
 
+#[inline(always)]
 pub fn outside_dns_list() -> Vec<SocketAddr> {
     if DISABLE_IPV6.load(Relaxed) {
         outside_dns_list_by_family(4)
@@ -391,6 +416,8 @@ pub fn outside_dns_list() -> Vec<SocketAddr> {
         outside_dns::IP_LIST.iter().map(|ip| { SocketAddr::new(*ip, 53) }).collect()
     }
 }
+
+#[inline(always)]
 pub fn outside_dns_list_by_family(family: u8) -> Vec<SocketAddr> {
     match family {
         4 => {
@@ -405,8 +432,9 @@ pub fn outside_dns_list_by_family(family: u8) -> Vec<SocketAddr> {
     }
 }
 
+#[inline(always)]
 pub fn inside_domain_list() -> Vec<String> {
-    inside_domains::LIST.iter().map(|domain| {
+    inside_domains::DOMAIN_LIST.iter().map(|domain| {
         let mut domain = domain.to_string();
         if ! domain.ends_with('.') {
             domain.push('.');
@@ -414,8 +442,10 @@ pub fn inside_domain_list() -> Vec<String> {
         domain
     }).collect()
 }
+
+#[inline(always)]
 pub fn outside_domain_list() -> Vec<String> {
-    outside_domains::LIST.iter().map(|domain| {
+    outside_domains::DOMAIN_LIST.iter().map(|domain| {
         let mut domain = domain.to_string();
         if ! domain.ends_with('.') {
             domain.push('.');

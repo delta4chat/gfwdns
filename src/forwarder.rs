@@ -8,10 +8,12 @@ pub struct DNSForwarder {
     global: SocketAddr, // recommended HitDNS proxied DoH. https://docs.rs/hitdns
 }
 impl DNSForwarder {
+    #[inline(always)]
     pub fn builder() -> DNSForwarderBuilder {
         Default::default()
     }
 
+    #[inline(always)]
     pub async fn run(self) -> anyhow::Result<()> {
         let udp = UdpSocket::bind(self.listen).await.context("cannot bind UDP")?;
         let tcp = TcpListener::bind(self.listen).await.context("cannot bind TCP")?;
@@ -22,6 +24,7 @@ impl DNSForwarder {
         ).await
     }
 
+    #[inline(always)]
     async fn handle_udp(&self, udp: UdpSocket) -> anyhow::Result<()> {
         let mut buf = vec![0u8; 65535];
         let mut wire: Vec<u8>;
@@ -90,6 +93,8 @@ impl DNSForwarder {
             }).detach();
         }
     }
+
+    #[inline(always)]
     async fn handle_tcp(&self, tcp: TcpListener) -> anyhow::Result<()> {
         loop {
             let (mut conn, peer) = tcp.accept().await?;
@@ -192,9 +197,12 @@ pub struct DNSForwarderBuilder {
     maybe_global: Option<SocketAddr>,
 }
 impl DNSForwarderBuilder {
+    #[inline(always)]
     pub fn new() -> Self {
         Default::default()
     }
+
+    #[inline(always)]
     pub async fn build(mut self) -> anyhow::Result<DNSForwarder> {
         let listen =
             match self.maybe_listen {
@@ -255,24 +263,31 @@ impl DNSForwarderBuilder {
         })
     }
 
+    #[inline(always)]
     pub fn status_cache(mut self, c: DomainStatusCache) -> Self {
         self.maybe_status_cache = Some(c);
         self
     }
 
+    #[inline(always)]
     pub fn detect_method_data(mut self, m: DomainSpoofDetectMethod, d: DomainSpoofDetectData) -> Self {
         self.detect_method_data_list.push((m, d));
         self
     }
 
+    #[inline(always)]
     pub fn listen(mut self, l: SocketAddr) -> Self {
         self.maybe_listen = Some(l);
         self
     }
+
+    #[inline(always)]
     pub fn local(mut self, ldns: SocketAddr) -> Self {
         self.maybe_local = Some(ldns);
         self
     }
+
+    #[inline(always)]
     pub fn global(mut self, g: SocketAddr) -> Self {
         self.maybe_global = Some(g);
         self

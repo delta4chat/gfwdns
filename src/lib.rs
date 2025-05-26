@@ -76,27 +76,34 @@ pub static DISABLE_IPV6: AtomicBool = AtomicBool::new(false);
 pub trait LogResult: Debug + Sized {
     fn log_generic(self, level: log::Level) -> Self;
 
+    #[inline(always)]
     fn log_error(self) -> Self {
         self.log_generic(log::Level::Error)
     }
 
+    #[inline(always)]
     fn log_warn(self) -> Self {
         self.log_generic(log::Level::Warn)
     }
 
+    #[inline(always)]
     fn log_info(self) -> Self {
         self.log_generic(log::Level::Info)
     }
 
+    #[inline(always)]
     fn log_debug(self) -> Self {
         self.log_generic(log::Level::Debug)
     }
+
+    #[inline(always)]
     fn log_trace(self) -> Self {
         self.log_generic(log::Level::Trace)
     }
 }
 
 impl<T: Debug, E: Debug> LogResult for Result<T, E> {
+    #[inline(always)]
     fn log_generic(self, level: log::Level) -> Self {
         if let Err(_) = self {
             log::log!(level, "{:?}", self);
@@ -105,6 +112,7 @@ impl<T: Debug, E: Debug> LogResult for Result<T, E> {
     }
 }
 impl<T: Debug, E: Debug> LogResult for &Result<T, E> {
+    #[inline(always)]
     fn log_generic(self, level: log::Level) -> Self {
         if let Err(_) = self {
             log::log!(level, "{:?}", self);
