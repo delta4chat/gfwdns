@@ -8,6 +8,7 @@ pub static DB_FILE: Lazy<PathBuf> = Lazy::new(|| {
     buf
 });
 
+#[inline(always)]
 pub fn data_dir(maybe_dir: Option<PathBuf>) -> anyhow::Result<&'static PathBuf> {
     static DATA_DIR: OnceCell<PathBuf> = OnceCell::new();
     loop {
@@ -62,6 +63,7 @@ pub struct GfwdnsOpt {
     pub global: Option<SocketAddr>,
 }
 
+#[inline(always)]
 async fn main_async() -> anyhow::Result<()> {
     env_logger::init();
 
@@ -120,6 +122,7 @@ async fn main_async() -> anyhow::Result<()> {
     forwarder.run().await
 }
 
+#[inline(always)]
 fn main() -> anyhow::Result<()> {
     smol::block_on(main_async())
 }
