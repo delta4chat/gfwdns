@@ -18,7 +18,7 @@ impl DNSForwarder {
         let udp = UdpSocket::bind(self.listen).await.context("cannot bind UDP")?;
         let tcp = TcpListener::bind(self.listen).await.context("cannot bind TCP")?;
 
-        smol::future::or(
+        futures_lite::future::or(
             self.handle_udp(udp),
             self.handle_tcp(tcp)
         ).await

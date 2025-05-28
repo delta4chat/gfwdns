@@ -24,9 +24,16 @@ portable-atomic = "1.10.0"
 postcard = { version = "1.1.1", features = ["use-std"] }
 scc = "2.2.6"
 serde = { version = "1.0.216", features = ["derive", "std", "alloc", "rc"] }
-smol = "2.0.2"
+
 smolscale2 = "0.6.0"
 smoltimeout = "0.6.2"
+
+async-net = "2.0.0"
+futures-lite = "2.6.0"
+
+async-io = "2.4.1"
+async-channel = "2.3.1"
+
 sqlx = { optional = true, version = "0.8.2", features = ["runtime-async-std", "sqlite"], default-features = false }
 
 [profile.dev]

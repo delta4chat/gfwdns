@@ -15,25 +15,36 @@ pub use forwarder::*;
 pub mod data;
 pub use data::*;
 
-pub use core::fmt::Debug;
-pub use core::borrow::Borrow;
+pub use core::{
+    fmt::Debug,
+    borrow::Borrow,
+};
 
-pub use std::time::{Duration, SystemTime, Instant};
-pub use std::sync::Arc;
-pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-pub use std::path::{Path, PathBuf};
+pub use std::{
+    time::{Duration, SystemTime, Instant},
+    sync::Arc,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    path::{Path, PathBuf},
+};
 
-pub use smol::net::{UdpSocket, TcpStream, TcpListener};
-pub use smol::io::{AsyncReadExt, AsyncWriteExt};
-pub use smol::future::FutureExt;
-pub use smol::stream::StreamExt;
+pub use async_net::{
+    UdpSocket,
+    TcpStream, TcpListener,
+};
+pub use futures_lite::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    future::FutureExt,
+    stream::StreamExt,
+};
 
 pub use once_cell::sync::{OnceCell, Lazy};
 
 pub use smoltimeout::TimeoutExt;
 
-pub use portable_atomic::AtomicBool;
-pub use portable_atomic::Ordering::Relaxed;
+pub use portable_atomic::{
+    AtomicBool,
+    Ordering::Relaxed,
+};
 
 pub use serde::{Serialize, Deserialize};
 

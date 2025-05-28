@@ -124,6 +124,6 @@ async fn main_async() -> anyhow::Result<()> {
 
 #[inline(always)]
 fn main() -> anyhow::Result<()> {
-    smol::block_on(main_async())
+    futures_lite::future::block_on(main_async())
 }
 

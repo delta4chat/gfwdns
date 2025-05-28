@@ -758,7 +758,7 @@ impl DomainSpoofDetector {
                 let wait = Duration::from_millis(150);
                 for _ in 0..3 {
                     if let Some(Ok(_)) = tcp.read_exact(&mut buf).timeout(timeout).await {
-                        smol::Timer::after(wait).await;
+                        async_io::Timer::after(wait).await;
                     } else {
                         return Ok(true);
                     }
@@ -844,7 +844,7 @@ async fn tcp_race_connect(addrs: &[SocketAddr]) -> anyhow::Result<TcpStream> {
         anyhow::bail!("tcp_race_connect: no addresses to connect!");
     }
 
-    let (conn_tx, conn_rx) = smol::channel::bounded(1);
+    let (conn_tx, conn_rx) = async_channel::bounded(1);
 
     let mut tasks = Vec::new();
     for addr in addrs.iter().copied() {
