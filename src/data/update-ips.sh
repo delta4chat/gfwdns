@@ -16,12 +16,12 @@ type mv
 type tee
 
 outdir="$(realpath .)"
-outfile="${outdir}/outside_ips.bin"
-outinfo="${outdir}/outside_ips.txt"
+inside_ips="${outdir}/inside_ips"
+outside_ips="${outdir}/outside_ips"
 
 py="${outdir}/ip2bin.py"
 
-tmp="$(mktemp -d -t gfwdnsGlobalIpUpdater.XXXXXXXX)"
+tmp="$(mktemp -d -t gfwdnsIpListUpdater.XXXXXXXX)"
 trap "rm -rfv $tmp" EXIT
 cd $tmp
 
@@ -32,12 +32,24 @@ cd rir-ip-master
 cd country
 
 {
+    cat cn/aggregated.json | jq -r '.subnets.ipv4[]' > txt.tmp.out
+    cat cn/aggregated.json | jq -r '.subnets.ipv6[]' >> txt.tmp.out
+
+    cat txt.tmp.out | sort -u | tee txt.tmp.out.2 | python3 $py
+} > bin.tmp.out
+
+mv bin.tmp.out "$inside_ips"'.bin'
+mv txt.tmp.out.2 "$inside_ips"'.txt'
+
+####################
+
+{
     cat {de,et,ec,tt,it}/aggregated.json | jq -r '.subnets.ipv4[]' > txt.tmp.out
     cat {de,et,ec,tt,it}/aggregated.json | jq -r '.subnets.ipv6[]' >> txt.tmp.out
 
     cat txt.tmp.out | sort -u | tee txt.tmp.out.2 | python3 $py
 } > bin.tmp.out
 
-mv bin.tmp.out $outfile
-mv txt.tmp.out.2 $outinfo
+mv bin.tmp.out "$outside_ips"'.bin'
+mv txt.tmp.out.2 "$outside_ips"'.txt'
 
